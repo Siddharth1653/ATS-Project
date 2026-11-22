@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-ATS Finder (Global + India)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1240px; margin: 24px auto; padding: 0 16px; color: #111827; background: #f9fafb; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    input, select, button { padding: 8px 12px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px; }
+    button { background: #111827; color: #fff; border: none; cursor: pointer; }
+    button.secondary { background: #fff; color: #111827; border: 1px solid #d1d5db; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    select.active-filter { border-color: #2563eb; background: #eff6ff; color: #1e40af; font-weight: 600; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+    input.active-filter { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+    .filter-summary { font-size: 12px; color: #6b7280; margin-top: 8px; }
+    .filter-summary .chip { display: inline-block; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; margin-right: 4px; cursor: pointer; }
+    .filter-summary .chip:hover { background: #bfdbfe; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e5e7eb; }
+    th { background: #f3f4f6; }
+    a { color: #2563eb; text-decoration: none; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .badge { padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; display: inline-block; background: #e5e7eb; color: #1f2937; }
+    .badge-status { background: #e0f2fe; color: #0369a1; font-size: 12px; }
+    .badge-exp { background: #f3e8ff; color: #6b21a8; }
+    .ats-greenhouse { background: #dcfce7; color: #166534; }
+    .ats-ashby { background: #ede9fe; color: #5b21b6; }
+    .ats-lever { background: #ffedd5; color: #9a3412; }
+    .ats-keka, .ats-zohorecruit, .ats-kula, .ats-darwinbox { background: #fef3c7; color: #92400e; }
+  </style>
+</head>
+<body>
+  <h2>Multi-ATS Company & Job Finder (Global + India)</h2>
+
+  <div class="card">
+    <div class="row">
+      <select id="crawlAts">
+        <option value="india">Indian ATS (Keka + Zoho + Kula + Darwinbox)</option>
+        <option value="all">All 14 ATS Boards</option>
+        <option value="keka">Keka (India)</option>
+        <option value="zohorecruit">Zoho Recruit (India)</option>
+        <option value="kula">Kula (India)</option>
+        <option value="darwinbox">Darwinbox (India)</option>
+        <option value="greenhouse">Greenhouse</option>
+        <option value="ashby">Ashby</option>
+        <option value="lever">Lever</option>
+        <option value="smartrecruiters">SmartRecruiters</option>
+        <option value="workable">Workable</option>
+        <option value="recruitee">Recruitee</option>
+        <option value="pinpoint">Pinpoint</option>
+        <option value="bamboohr">BambooHR</option>
+        <option value="breezy">Breezy HR</option>
+        <option value="teamtailor">Teamtailor</option>
+      </select>
+      <select id="source">
+        <option value="both">Common Crawl + Wayback</option>
+        <option value="commoncrawl">Common Crawl only</option>
+        <option value="wayback">Wayback only</option>
+      </select>
+      <input id="limit" type="number" value="2000" min="100" max="20000" step="500" style="width: 95px;" />
+      <label><input id="deep" type="checkbox" /> Deep Crawl</label>
+      <input id="prefixes" type="text" value="e-m" placeholder="e.g. e-m, n-z, 0-9" style="width: 150px;" />
+      <button id="discoverBtn" onclick="startDiscovery()">Discover Companies</button>
+      <button class="secondary" type="button" onclick="exportExcel()">Export Excel (.xlsx)</button>
+      <span id="statusText" class="badge badge-status">Idle</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Freehire Module</h3>
+    <div class="row">
+      <input id="fhQuery" placeholder="Keyword (optional)" />
+      <input id="fhCountry" value="IN" maxlength="3" style="width: 75px;" title="Country code" />
+      <label><input id="fhRemote" type="checkbox" /> Remote only</label>
+      <input id="fhLimit" type="number" value="100" min="1" max="500" style="width: 95px;" title="Maximum jobs (up to 500)" />
+      <button id="fhBtn" type="button" onclick="syncFreehire()">Fetch from Freehire</button>
+      <span id="fhStatus" class="badge badge-status">Idle</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Extra Free Sources (JobSpy / ATS-Scrapers / RemoteOK / Arbeitnow)</h3>
+    <div class="row">
+      <select id="exSource">
+        <option value="jobspy">JobSpy (Naukri / LinkedIn / Indeed)</option>
+        <option value="ats_scrapers">ATS-Scrapers Dataset</option>
+        <option value="all_json">RemoteOK + Arbeitnow (No Auth)</option>
+        <option value="remoteok">RemoteOK Only</option>
+        <option value="arbeitnow">Arbeitnow Only</option>
+      </select>
+      <input id="exSites" value="naukri,linkedin,indeed" placeholder="naukri,linkedin,indeed" style="width: 205px;" title="JobSpy sites: naukri, linkedin, indeed, glassdoor" />
+      <input id="exQuery" value="AI Engineer" placeholder="Keyword" />
+      <input id="exLoc" value="India" placeholder="Location" style="width: 125px;" />
+      <input id="exHours" type="number" value="72" min="1" max="720" style="width: 75px;" title="JobSpy age in hours" />
+      <label><input id="exRemote" type="checkbox" /> Remote only</label>
+      <input id="exLimit" type="number" value="50" min="10" max="300" style="width: 75px;" />
+      <button id="exBtn" type="button" onclick="syncExtra()">Fetch Extra Jobs</button>
+      <span id="exStatus" class="badge badge-status">Idle</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Remote Job Boards (Himalayas / Remotive)</h3>
+    <div class="row">
+      <select id="boardsSource">
+        <option value="both">Both sources</option>
+        <option value="himalayas">Himalayas</option>
+        <option value="remotive">Remotive</option>
+      </select>
+      <input id="boardsQuery" placeholder="Keyword (e.g. AI Engineer)" />
+      <input id="boardsCountry" value="IN" style="width: 75px;" title="Country code" />
+      <label><input id="boardsWorldwide" type="checkbox" checked /> Worldwide</label>
+      <input id="boardsLimit" type="number" value="100" min="10" max="300" style="width: 85px;" title="Maximum jobs per source (10-300)" />
+      <button id="boardsBtn" type="button" onclick="syncBoards()">Fetch Jobs</button>
+      <span id="boardsStatus" class="badge badge-status">Idle</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Direct AI Career Pages (Non-ATS)</h3>
+    <div class="row">
+      <label><input id="directSourceYc" type="checkbox" checked /> YC AI Startups</label>
+      <label><input id="directSourceHn" type="checkbox" checked /> HN Hiring</label>
+      <label><input id="directSourceDotai" type="checkbox" checked /> .ai Domains</label>
+      <input id="directLimit" type="number" value="150" min="20" max="1000" style="width: 85px;" title="Maximum companies to check (20-1000)" />
+      <button id="directBtn" type="button" onclick="syncDirect()">Find Direct Career Pages</button>
+      <label><input id="directAuto" type="checkbox" onchange="setDirectAuto()" /> Auto-discover every</label>
+      <input id="directInterval" type="number" value="12" min="1" max="168" style="width: 65px;" />
+      <span>hrs</span>
+      <span id="directStatus" class="badge badge-status">Idle</span>
+    </div>
+    <div class="row" style="margin-top: 12px;">
+      <strong>Enrich Existing DB Companies</strong>
+      <select id="enrichAts">
+        <option value="all">All Saved Companies</option>
+        <option value="naukri">Naukri</option>
+        <option value="linkedin">LinkedIn</option>
+        <option value="indeed">Indeed</option>
+        <option value="freehire">Freehire</option>
+        <option value="greenhouse">Greenhouse</option>
+        <option value="ashby">Ashby</option>
+        <option value="lever">Lever</option>
+        <option value="zohorecruit">Zoho Recruit</option>
+        <option value="remoteok">RemoteOK</option>
+        <option value="arbeitnow">Arbeitnow</option>
+      </select>
+      <input id="enrichLimit" type="number" value="100" min="10" max="1000" style="width: 80px;" />
+      <label><input id="enrichScrapeJobs" type="checkbox" checked /> Also scrape AI jobs</label>
+      <button id="enrichBtn" type="button" onclick="enrichDbCompanies()">Find Career Pages for DB Companies</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button id="tabCompanies" onclick="switchTab('companies')">Companies</button>
+    <button id="tabJobs" class="secondary" onclick="switchTab('jobs')">Live Jobs</button>
+  </div>
+
+  <div id="companiesView" class="card">
+    <div class="row">
+      <select id="companyAtsFilter" onchange="loadCompanies()">
+        <option value="all">All ATS</option>
+        <option value="india">Indian ATS Only</option>
+        <option value="freehire">Freehire (Aggregator)</option>
+        <option value="himalayas">Himalayas (Remote)</option>
+        <option value="remotive">Remotive (Remote)</option>
+        <option value="naukri">Naukri</option>
+        <option value="linkedin">LinkedIn</option>
+        <option value="indeed">Indeed</option>
+        <option value="glassdoor">Glassdoor</option>
+        <option value="ats_scrapers">ATS-Scrapers</option>
+        <option value="remoteok">RemoteOK</option>
+        <option value="arbeitnow">Arbeitnow</option>
+        <option value="direct">Direct Career Pages (Non-ATS)</option>
+        <option value="keka">Keka</option>
+        <option value="zohorecruit">Zoho Recruit</option>
+        <option value="kula">Kula</option>
+        <option value="darwinbox">Darwinbox</option>
+        <option value="greenhouse">Greenhouse</option>
+        <option value="ashby">Ashby</option>
+        <option value="lever">Lever</option>
+        <option value="smartrecruiters">SmartRecruiters</option>
+        <option value="workable">Workable</option>
+        <option value="recruitee">Recruitee</option>
+        <option value="pinpoint">Pinpoint</option>
+        <option value="bamboohr">BambooHR</option>
+        <option value="breezy">Breezy HR</option>
+        <option value="teamtailor">Teamtailor</option>
+      </select>
+      <input id="companySearch" placeholder="Search company name or slug..." oninput="loadCompanies()" style="flex: 1;" />
+      <input id="minJobs" type="number" value="0" min="0" oninput="loadCompanies()" style="width: 95px;" title="Min open jobs" />
+    </div>
+    <table>
+      <thead><tr><th>ATS</th><th>Company</th><th>Token</th><th>Jobs</th><th>Careers Page</th><th>Direct Careers</th></tr></thead>
+      <tbody id="companiesBody"></tbody>
+    </table>
+  </div>
+
+  <div id="jobsView" class="card" style="display: none;">
+    <div class="row">
+      <select id="jobAtsFilter" onchange="loadJobs()">
+        <option value="all">All ATS</option>
+        <option value="india">Indian ATS Only</option>
+        <option value="freehire">Freehire (Aggregator)</option>
+        <option value="himalayas">Himalayas (Remote)</option>
+        <option value="remotive">Remotive (Remote)</option>
+        <option value="naukri">Naukri</option>
+        <option value="linkedin">LinkedIn</option>
+        <option value="indeed">Indeed</option>
+        <option value="glassdoor">Glassdoor</option>
+        <option value="ats_scrapers">ATS-Scrapers</option>
+        <option value="remoteok">RemoteOK</option>
+        <option value="arbeitnow">Arbeitnow</option>
+        <option value="direct">Direct Career Pages (Non-ATS)</option>
+        <option value="keka">Keka</option>
+        <option value="zohorecruit">Zoho Recruit</option>
+        <option value="kula">Kula</option>
+        <option value="greenhouse">Greenhouse</option>
+        <option value="ashby">Ashby</option>
+        <option value="lever">Lever</option>
+        <option value="smartrecruiters">SmartRecruiters</option>
+        <option value="workable">Workable</option>
+        <option value="recruitee">Recruitee</option>
+        <option value="pinpoint">Pinpoint</option>
+        <option value="bamboohr">BambooHR</option>
+        <option value="breezy">Breezy HR</option>
+        <option value="teamtailor">Teamtailor</option>
+      </select>
+      <select id="jobRoleFilter" onchange="loadJobs()">
+        <option value="target_all" selected>All AI + GenAI + ML + FDE</option>
+        <option value="genai_agentic">GenAI / Agentic AI / LLM</option>
+        <option value="ml_nlp">ML / AI / NLP</option>
+        <option value="fde">Forward Deployed Engineer</option>
+        <option value="data">Data Science / Analytics</option>
+        <option value="intern">Internships / Fresher</option>
+        <option value="all">All Roles (Unfiltered)</option>
+      </select>
+      <select id="jobExpFilter" onchange="loadJobs()">
+        <option value="all">All Experience</option>
+        <option value="0-1">0-1 yrs</option>
+        <option value="1-2">1-2 yrs</option>
+        <option value="2-3">2-3 yrs</option>
+        <option value="3+">3+ yrs</option>
+      </select>
+      <input id="jobLocation" list="locOptions" placeholder="Location (e.g. India, Pune, Remote)" oninput="loadJobs()" style="width: 210px;" />
+      <datalist id="locOptions">
+        <option value="India"></option>
+        <option value="Bengaluru"></option>
+        <option value="Bangalore"></option>
+        <option value="Pune"></option>
+        <option value="Hyderabad"></option>
+        <option value="Mumbai"></option>
+        <option value="Delhi"></option>
+        <option value="Gurugram"></option>
+        <option value="Noida"></option>
+        <option value="Chennai"></option>
+        <option value="Remote"></option>
+      </datalist>
+      <select id="jobRemoteFilter" onchange="loadJobs()">
+        <option value="all">All Locations</option>
+        <option value="remote_any">Any Remote</option>
+        <option value="remote_india">Remote — India</option>
+        <option value="remote_global">Remote — Global / Unspecified</option>
+        <option value="remote_us">Remote — US / Americas</option>
+        <option value="remote_eu">Remote — UK / Europe</option>
+        <option value="remote_flexible">Remote — Flexible / Hybrid</option>
+        <optgroup id="dynamicRemoteGroup" label="Other Discovered Remote Types"></optgroup>
+      </select>
+      <input id="jobExcludeLoc" placeholder="Exclude regions (e.g. United States, UK, Poland, Spain)" oninput="saveExcludeAndLoad()" style="min-width: 220px;" />
+      <input id="jobQuery" placeholder="Extra keyword (e.g. LangGraph, Python)" oninput="loadJobs()" style="flex: 1; min-width: 180px;" />
+      <button class="secondary" type="button" onclick="resetJobFilters()" style="font-size: 12px; padding: 6px 10px;">✕ Reset</button>
+    </div>
+    <div id="jobFilterSummary" class="filter-summary"></div>
+    <table>
+      <thead><tr><th>ATS</th><th>Company</th><th>Role</th><th>Experience</th><th>Location</th><th>Apply</th></tr></thead>
+      <tbody id="jobsBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    let currentTab = "companies";
+    let directWasRunning = false;
+    let extraWasRunning = false;
+    const badge = a => `<span class="badge ats-${a}">${a.toUpperCase()}</span>`;
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById("companiesView").style.display = tab === "companies" ? "block" : "none";
+      document.getElementById("jobsView").style.display = tab === "jobs" ? "block" : "none";
+      document.getElementById("tabCompanies").className = tab === "companies" ? "" : "secondary";
+      document.getElementById("tabJobs").className = tab === "jobs" ? "" : "secondary";
+      tab === "companies" ? loadCompanies() : loadJobs();
+    }
+
+    async function startDiscovery() {
+      const ats = document.getElementById("crawlAts").value;
+      const source = document.getElementById("source").value;
+      const limit = document.getElementById("limit").value;
+      const prefixes = encodeURIComponent(document.getElementById("prefixes").value.trim() || "a-z");
+      const deep = document.getElementById("deep").checked;
+      const response = await fetch(`/api/discover?ats=${ats}&source=${source}&limit=${limit}&prefixes=${prefixes}&deep=${deep}`, { method: "POST" });
+      if (!response.ok) {
+        const result = await response.json();
+        document.getElementById("statusText").textContent = `Error: ${result.detail || "Unable to start discovery"}`;
+        return;
+      }
+      pollStatus();
+    }
+
+    async function syncFreehire() {
+      const button = document.getElementById("fhBtn");
+      const params = new URLSearchParams({
+        q: document.getElementById("fhQuery").value.trim(),
+        country: document.getElementById("fhCountry").value.trim() || "IN",
+        remote_only: String(document.getElementById("fhRemote").checked),
+        limit: document.getElementById("fhLimit").value || "100"
+      });
+      button.disabled = true;
+      document.getElementById("fhStatus").textContent = "Starting...";
+      try {
+        const response = await fetch(`/api/freehire/sync?${params}`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Unable to start Freehire sync");
+        pollFreehire();
+      } catch (error) {
+        button.disabled = false;
+        document.getElementById("fhStatus").textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function enrichDbCompanies() {
+      const button = document.getElementById("enrichBtn");
+      const params = new URLSearchParams({
+        source_ats: document.getElementById("enrichAts").value,
+        limit: document.getElementById("enrichLimit").value || "100",
+        only_missing: "true",
+        scrape_jobs: String(document.getElementById("enrichScrapeJobs").checked)
+      });
+      button.disabled = true;
+      document.getElementById("directStatus").textContent = "Starting DB enrichment...";
+      try {
+        const response = await fetch(`/api/direct/enrich-db?${params}`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Unable to start DB enrichment");
+        directWasRunning = true;
+        pollDirectStatus();
+      } catch (error) {
+        button.disabled = false;
+        document.getElementById("directStatus").textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function pollFreehire() {
+      try {
+        const response = await fetch("/api/freehire/status");
+        const status = await response.json();
+        document.getElementById("fhStatus").textContent = status.running
+          ? `${status.stage} | Fetched: ${status.fetched_jobs} | Companies: ${status.saved_companies}`
+          : status.error
+            ? `Error: ${status.error}`
+            : `Saved ${status.fetched_jobs} jobs / ${status.saved_companies} companies (${status.stage})`;
+        if (status.running) {
+          setTimeout(pollFreehire, 1500);
+        } else {
+          document.getElementById("fhBtn").disabled = false;
+          refreshRemoteTypes();
+          pollStatus(false);
+        }
+      } catch (error) {
+        document.getElementById("fhBtn").disabled = false;
+        document.getElementById("fhStatus").textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function syncExtra() {
+      const button = document.getElementById("exBtn");
+      const params = new URLSearchParams({
+        source: document.getElementById("exSource").value,
+        sites: document.getElementById("exSites").value.trim() || "naukri,linkedin,indeed",
+        q: document.getElementById("exQuery").value.trim(),
+        location: document.getElementById("exLoc").value.trim() || "India",
+        hours_old: document.getElementById("exHours").value || "72",
+        remote_only: String(document.getElementById("exRemote").checked),
+        limit: document.getElementById("exLimit").value || "50"
+      });
+      button.disabled = true;
+      document.getElementById("exStatus").textContent = "Starting...";
+      try {
+        const response = await fetch(`/api/extra/sync?${params}`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Unable to start extra-source sync");
+        extraWasRunning = true;
+        pollExtra();
+      } catch (error) {
+        button.disabled = false;
+        document.getElementById("exStatus").textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function pollExtra() {
+      try {
+        const response = await fetch("/api/extra/status");
+        const status = await response.json();
+        if (!response.ok) throw new Error(status.detail || "Unable to read extra-source status");
+        document.getElementById("exStatus").textContent = status.running
+          ? `${status.stage} | Fetched: ${status.fetched_jobs} | Companies: ${status.saved_companies}`
+          : status.error
+            ? `Error: ${status.error}`
+            : `Fetched ${status.fetched_jobs} jobs / ${status.saved_companies} companies (${status.stage})`;
+        if (status.running) {
+          extraWasRunning = true;
+          setTimeout(pollExtra, 1500);
+        } else {
+          document.getElementById("exBtn").disabled = false;
+          if (extraWasRunning) {
+            extraWasRunning = false;
+            pollStatus();
+          }
+        }
+      } catch (error) {
+        document.getElementById("exBtn").disabled = false;
+        document.getElementById("exStatus").textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function syncBoards() {
+      const button = document.getElementById("boardsBtn");
+      const params = new URLSearchParams({
+        source: document.getElementById("boardsSource").value,
+        q: document.getElementById("boardsQuery").value.trim(),
+        country: document.getElementById("boardsCountry").value.trim(),
+        worldwide: String(document.getElementById("boardsWorldwide").checked),
+        limit: document.getElementById("boardsLimit").value || "100"
+      });
+      button.disabled = true;
+      document.getElementById("boardsStatus").textContent = "Starting...";
+      try {
+        const response = await fetch(`/api/boards/sync?${params}`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Unable to start remote board sync");
+        pollBoardsStatus();
+      } catch (error) {
+        button.disabled = false;
+        document.getElementById("boardsStatus").textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function pollBoardsStatus() {
+      try {
+        const response = await fetch("/api/boards/status");
+        const status = await response.json();
+        if (!response.ok) throw new Error(status.detail || "Unable to read remote board sync status");
+        document.getElementById("boardsStatus").textContent = status.running
+          ? `${status.stage} | Fetched: ${status.fetched_jobs} | Companies: ${status.saved_companies}`
+          : status.error
+            ? `Error: ${status.error}`
+            : `Fetched ${status.fetched_jobs} jobs / ${status.saved_companies} companies (${status.stage})`;
+        if (status.running) {
+          setTimeout(pollBoardsStatus, 1500);
+        } else {
+          document.getElementById("boardsBtn").disabled = false;
+          pollStatus();
+        }
+      } catch (error) {
+        document.getElementById("boardsBtn").disabled = false;
+        document.getElementById("boardsStatus").textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function syncDirect() {
+      const selectedSources = [
+        ["yc", document.getElementById("directSourceYc").checked],
+        ["hn", document.getElementById("directSourceHn").checked],
+        ["dotai", document.getElementById("directSourceDotai").checked]
+      ].filter(([, selected]) => selected).map(([source]) => source);
+      if (!selectedSources.length) {
+        document.getElementById("directStatus").textContent = "Select at least one source";
+        return;
+      }
+      const params = new URLSearchParams({
+        sources: selectedSources.join(","),
+        limit: document.getElementById("directLimit").value || "150",
+        skip_existing: "true"
+      });
+      document.getElementById("directBtn").disabled = true;
+      document.getElementById("directStatus").textContent = "Starting...";
+      try {
+        const response = await fetch(`/api/direct/sync?${params}`, { method: "POST" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Unable to start direct career discovery");
+        directWasRunning = true;
+        pollDirectStatus();
+      } catch (error) {
+        document.getElementById("directBtn").disabled = false;
+        document.getElementById("directStatus").textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function setDirectAuto() {
+      const checkbox = document.getElementById("directAuto");
+      const params = new URLSearchParams({
+        enabled: String(checkbox.checked),
+        interval_hours: document.getElementById("directInterval").value || "12"
+      });
+      try {
+        const response = await fetch(`/api/direct/auto?${params}`, { method: "POST" });
+        const status = await response.json();
+        if (!response.ok) throw new Error(status.detail || "Unable to update auto-discovery");
+        checkbox.checked = status.auto_enabled;
+        pollDirectStatus();
+      } catch (error) {
+        checkbox.checked = !checkbox.checked;
+        document.getElementById("directStatus").textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function pollDirectStatus() {
+      try {
+        const response = await fetch("/api/direct/status");
+        const status = await response.json();
+        if (!response.ok) throw new Error(status.detail || "Unable to read direct discovery status");
+        document.getElementById("directAuto").checked = status.auto_enabled;
+        document.getElementById("directInterval").value = status.interval_hours;
+        const autoLabel = status.auto_enabled ? ` | Auto every ${status.interval_hours}h` : "";
+        document.getElementById("directStatus").textContent = status.running
+          ? `${status.stage} | Domains: ${status.domains_found} | Pages: ${status.pages_found} | Jobs: ${status.jobs_saved}${autoLabel}`
+          : status.error
+            ? `${status.stage}: ${status.error}${autoLabel}`
+            : `${status.stage} | Domains: ${status.domains_found} | Pages: ${status.pages_found} | Jobs: ${status.jobs_saved}${autoLabel}`;
+        document.getElementById("directBtn").disabled = status.running;
+        document.getElementById("enrichBtn").disabled = status.running;
+        if (status.running) {
+          directWasRunning = true;
+          setTimeout(pollDirectStatus, 2000);
+        } else {
+          if (directWasRunning) {
+            directWasRunning = false;
+            pollStatus();
+          }
+          if (status.auto_enabled) setTimeout(pollDirectStatus, 30000);
+        }
+      } catch (error) {
+        document.getElementById("directStatus").textContent = `Error: ${error.message}`;
+        document.getElementById("directBtn").disabled = false;
+        document.getElementById("enrichBtn").disabled = false;
+      }
+    }
+
+    function exportExcel() {
+      const ats = currentTab === "jobs"
+        ? document.getElementById("jobAtsFilter").value
+        : document.getElementById("companyAtsFilter").value;
+      const q = encodeURIComponent(document.getElementById("companySearch").value || "");
+      const minJobs = document.getElementById("minJobs").value || 0;
+      const jobQ = encodeURIComponent(document.getElementById("jobQuery").value || "");
+      const loc = encodeURIComponent(document.getElementById("jobLocation").value || "");
+      const role = document.getElementById("jobRoleFilter").value;
+      const exp = document.getElementById("jobExpFilter").value;
+      const remoteType = encodeURIComponent(document.getElementById("jobRemoteFilter").value);
+      const excludeLoc = encodeURIComponent(document.getElementById("jobExcludeLoc").value || "");
+      window.location.href = `/api/export/companies.xlsx?ats=${ats}&q=${q}&min_jobs=${minJobs}&job_q=${jobQ}&location=${loc}&role=${role}&exp=${exp}&remote_type=${remoteType}&exclude_loc=${excludeLoc}&include_jobs=true`;
+    }
+
+    async function pollStatus(refreshRemoteTypesOnComplete = true) {
+      const s = await (await fetch("/api/status")).json();
+      document.getElementById("discoverBtn").disabled = s.running;
+      if (s.running) {
+        document.getElementById("statusText").textContent =
+          `${s.stage} | Found: ${s.tokens_found} | Checked: ${s.verified_checked} | Active: ${s.active_companies}`;
+        setTimeout(() => pollStatus(refreshRemoteTypesOnComplete), 2000);
+      } else {
+        const b = Object.entries(s.by_ats || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+        document.getElementById("statusText").textContent =
+          `Saved: ${s.db_companies} companies (${b || "0"}), ${s.db_jobs} jobs (${s.stage})`;
+        if (refreshRemoteTypesOnComplete) refreshRemoteTypes();
+        currentTab === "companies" ? loadCompanies() : loadJobs();
+      }
+    }
+
+    async function loadCompanies() {
+      const ats = document.getElementById("companyAtsFilter").value;
+      const q = encodeURIComponent(document.getElementById("companySearch").value);
+      const minJobs = document.getElementById("minJobs").value || 0;
+      const rows = await (await fetch(`/api/companies?ats=${ats}&q=${q}&min_jobs=${minJobs}`)).json();
+      document.getElementById("companiesBody").innerHTML = rows.map(c => `
+        <tr><td>${badge(c.ats)}</td><td><strong>${c.name}</strong></td><td><code>${c.token}</code></td><td>${c.job_count}</td><td><a href="${c.board_url}" target="_blank">Open Board</a></td><td>${c.career_url ? `<a href="${c.career_url}" target="_blank">Careers</a>` : ""}</td></tr>
+      `).join("");
+    }
+
+    function highlightActiveFilters() {
+      const ids = ["jobAtsFilter", "jobRoleFilter", "jobExpFilter", "jobRemoteFilter"];
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        el.classList.toggle("active-filter", el.value !== "all");
+      });
+      const locEl = document.getElementById("jobLocation");
+      locEl.classList.toggle("active-filter", locEl.value.trim() !== "");
+      const qEl = document.getElementById("jobQuery");
+      qEl.classList.toggle("active-filter", qEl.value.trim() !== "");
+      const excludeEl = document.getElementById("jobExcludeLoc");
+      excludeEl.classList.toggle("active-filter", excludeEl.value.trim() !== "");
+
+      // Build filter summary chips
+      const chips = [];
+      const atsEl = document.getElementById("jobAtsFilter");
+      if (atsEl.value !== "all") chips.push({ label: `ATS: ${atsEl.options[atsEl.selectedIndex].text}`, reset: () => { atsEl.value = "all"; loadJobs(); } });
+      const roleEl = document.getElementById("jobRoleFilter");
+      if (roleEl.value !== "all") chips.push({ label: `Role: ${roleEl.options[roleEl.selectedIndex].text}`, reset: () => { roleEl.value = "all"; loadJobs(); } });
+      const expEl = document.getElementById("jobExpFilter");
+      if (expEl.value !== "all") chips.push({ label: `Exp: ${expEl.options[expEl.selectedIndex].text}`, reset: () => { expEl.value = "all"; loadJobs(); } });
+      const remoteEl = document.getElementById("jobRemoteFilter");
+      if (remoteEl.value !== "all") chips.push({ label: "Remote filter", reset: () => { remoteEl.value = "all"; loadJobs(); } });
+      if (locEl.value.trim()) chips.push({ label: `Loc: ${locEl.value}`, reset: () => { locEl.value = ""; loadJobs(); } });
+      if (excludeEl.value.trim()) chips.push({ label: "Excluded regions", reset: () => { excludeEl.value = ""; localStorage.removeItem("jobExcludeLoc"); loadJobs(); } });
+      if (qEl.value.trim()) chips.push({ label: `Keyword: ${qEl.value}`, reset: () => { qEl.value = ""; loadJobs(); } });
+
+      const summaryEl = document.getElementById("jobFilterSummary");
+      if (chips.length) {
+        summaryEl.innerHTML = chips.map((c, i) => `<span class="chip" data-idx="${i}">${c.label} ✕</span>`).join("") + ` — showing filtered results`;
+        summaryEl.querySelectorAll(".chip").forEach((el, i) => el.addEventListener("click", () => { chips[i].reset(); }));
+      } else {
+        summaryEl.innerHTML = "";
+      }
+    }
+
+    function resetJobFilters() {
+      document.getElementById("jobAtsFilter").value = "all";
+      document.getElementById("jobRoleFilter").value = "target_all";
+      document.getElementById("jobExpFilter").value = "all";
+      document.getElementById("jobLocation").value = "";
+      document.getElementById("jobRemoteFilter").value = "all";
+      document.getElementById("jobExcludeLoc").value = "";
+      localStorage.removeItem("jobExcludeLoc");
+      document.getElementById("jobQuery").value = "";
+      loadJobs();
+    }
+
+    function saveExcludeAndLoad() {
+      localStorage.setItem("jobExcludeLoc", document.getElementById("jobExcludeLoc").value);
+      loadJobs();
+    }
+
+    async function loadRemoteTypes() {
+      const response = await fetch("/api/remote-types");
+      if (!response.ok) throw new Error(`Unable to load remote types (${response.status})`);
+      const remoteTypes = await response.json();
+      const select = document.getElementById("jobRemoteFilter");
+      const group = document.getElementById("dynamicRemoteGroup");
+      const selectedValue = select.value;
+      group.replaceChildren();
+      for (const remoteType of remoteTypes) {
+        const option = document.createElement("option");
+        option.value = remoteType.value;
+        option.textContent = remoteType.label;
+        group.appendChild(option);
+      }
+      if ([...select.options].some(option => option.value === selectedValue)) {
+        select.value = selectedValue;
+      } else {
+        select.value = "all";
+      }
+    }
+
+    function refreshRemoteTypes() {
+      loadRemoteTypes().catch(error => {
+        document.getElementById("statusText").textContent = `Remote types error: ${error.message}`;
+      });
+    }
+
+    async function loadJobs() {
+      highlightActiveFilters();
+      const ats = document.getElementById("jobAtsFilter").value;
+      const role = document.getElementById("jobRoleFilter").value;
+      const exp = document.getElementById("jobExpFilter").value;
+      const loc = encodeURIComponent(document.getElementById("jobLocation").value);
+      const q = encodeURIComponent(document.getElementById("jobQuery").value);
+      const remoteType = encodeURIComponent(document.getElementById("jobRemoteFilter").value);
+      const excludeLoc = encodeURIComponent(document.getElementById("jobExcludeLoc").value);
+      const rows = await (await fetch(`/api/jobs?ats=${ats}&role=${role}&exp=${exp}&location=${loc}&q=${q}&remote_type=${remoteType}&exclude_loc=${excludeLoc}`)).json();
+      document.getElementById("jobsBody").innerHTML = rows.length ? rows.map(j => `
+        <tr>
+          <td>${badge(j.ats)}</td>
+          <td>${j.company_name}</td>
+          <td><strong>${j.title}</strong></td>
+          <td><span class="badge badge-exp">${j.exp_label || "Unspecified"}</span></td>
+          <td>${j.location}</td>
+          <td><a href="${j.absolute_url}" target="_blank">Apply</a></td>
+        </tr>
+      `).join("") : `<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:24px;">No jobs match the selected filters.</td></tr>`;
+    }
+
+    document.getElementById("jobExcludeLoc").value = localStorage.getItem("jobExcludeLoc") || "";
+    refreshRemoteTypes();
+    pollExtra();
+    pollDirectStatus();
+    pollStatus(false);
+  </script>
+</body>
+</html>
